@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: 'Segoe UI', sans-serif; background-color: #2D3748; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+  .card { background: white; padding: 30px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+  .logo { max-height: 70px; margin-bottom: 10px; }
+  input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+  .info-box { background: #edf2f7; padding: 10px; border-radius: 8px; margin: 10px 0; display: none; font-size: 14px; text-align: right; border-right: 5px solid #2D3748; }
+  button { width: 100%; padding: 15px; background: #2D3748; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.3s; }
+  button:hover { background: #1a202c; }
+  label { display: block; text-align: right; font-size: 13px; font-weight: bold; color: #4a5568; }
+</style>
+</head>
+<body>
+<div class="card">
+  <img src="https://drive.google.com/thumbnail?sz=w1000&id=132VjMWMruovtetRSIyKSioIgidcAVx52" class="logo">
+  <h2 style="color:#2D3748">طلب إجازة 📝</h2>
+  
+  <label>الرقم الوظيفي:</label>
+  <input type="text" id="empId" placeholder="أدخل رقمك" oninput="fetchDetails()">
+  
+  <div id="infoBox" class="info-box"></div>
+  
+  <label>نوع الإجازة:</label>
+  <select id="leaveType" onchange="toggleFile()">
+    <option value="سنوية">سنوية</option>
+    <option value="مرضية">مرضية</option>
+    <option value="اضطرارية">اضطرارية</option>
+  </select>
+  
+  <div id="fileArea" style="display:none">
+    <label>إرفاق التقرير الطبي:</label>
+    <input type="file" id="fileInput">
+  </div>
+  
+  <div style="display:flex; gap:10px">
+    <div style="flex:1"><label>من:</label><input type="date" id="from"></div>
+    <div style="flex:1"><label>إلى:</label><input type="date" id="to"></div>
+  </div>
+  
+  <button id="sendBtn" onclick="submitForm()">إرسال الطلب</button>
+  <p id="msg" style="font-weight:bold; color:#2D3748"></p>
+</div>
+
+<script>
+  let empName = "";
+  function fetchDetails() {
+    let id = document.getElementById('empId').value;
+    if (id.length > 0) {
+      google.script.run.withSuccessHandler(d => {
+        let box = document.getElementById('infoBox');
+        if (d) { empName = d.name; box.style.display='block'; box.innerHTML="👤 الموظف: "+d.name+"<br>🏢 القسم: "+d.department; box.style.color="#2D3748"; }
+        else { empName = ""; box.style.display='block'; box.innerHTML="❌ الرقم غير صحيح"; box.style.color="red"; }
+      }).getEmployeeDetails(id);
+    }
+  }
+  function toggleFile() { document.getElementById('fileArea').style.display = (document.getElementById('leaveType').value == 'مرضية') ? 'block' : 'none'; }
+  
+  function submitForm() {
+    if (!empName) return alert("تأكد من الرقم الوظيفي!");
+    let btn = document.getElementById('sendBtn');
+    btn.disabled = true; document.getElementById('msg').innerHTML = "جاري الإرسال... ⏳";
+    
+    let file = document.getElementById('fileInput').files[0];
+    if (file) {
+      let reader = new FileReader();
+      reader.onload = e => sendData(e.target.result.split(',')[1], file.type, file.name);
+      reader.readAsDataURL(file);
+    } else { sendData(null, null, null); }
+  }
+
+  function sendData(base64, mime, name) {
+    let payload = {
+      empId: document.getElementById('empId').value,
+      name: empName,
+      type: document.getElementById('leaveType').value,
+      fromDate: document.getElementById('from').value,
+      toDate: document.getElementById('to').value,
+      attachment: base64 ? { base64: base64, mimeType: mime, fileName: name } : null
+    };
+    google.script.run.withSuccessHandler(res => {
+      document.getElementById('msg').innerHTML = res;
+      if (res.includes("بنجاح")) setTimeout(() => location.reload(), 3000);
+      else document.getElementById('sendBtn').disabled = false;
+    }).processLeaveRequest(payload);
+  }
+</script>
+</body>
+</html>
